@@ -24,32 +24,50 @@
   </head> 
   <body bgcolor="black" height="100%" width="100%"> 
     <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas> 
-    <script>
+<script>
 var canvas = document.getElementById('c');
 var host = window.location.host;
 var context = canvas.getContext("2d");
 var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
+// var etag = "";
 
 
 function sendJSONXMLHTTPRequest(url, objects, callback) {
     var xhr = new XMLHttpRequest();
+    // var startTime = (new Date()).getTime();
     xhr.onreadystatechange = function () {
         if (xhr.readyState==4) {
+            var endTime = (new Date()).getTime();
             try {
                 if (xhr.status==200) {
                     //XXX: parse some JSON from the request!
                     //XXX: Pass the data to the callback!
+                    var data = JSON.parse(xhr.responseText);
+                    // console.log("data", data);
+                    callback(data);
+                    // if(xhr.getResponseHeader('ETag') != etag){
+                    //     etag = xhr.getResponseHeader('ETag');
+                    // }
                 }
             } 
             catch(e) {
                 alert('Error: ' + e.name);
             }
+            // console.log("Took " + (endTime - startTime) + 'ms');
         }
     };
     //XXX: POST to a URL
     //XXX: set the mimetype and the accept headers!
     // Remember to use application/json !
+    // https://stackoverflow.com/questions/39519246/make-xmlhttprequest-post-using-json
+    // author: Gilles Quenot
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+    xhr.setRequestHeader("Accept", "application/json")
+    // xhr.setRequestHeader("If-None-Match", etag)
+    xhr.send(JSON.stringify(objects))
+
 }
 
 
@@ -135,16 +153,18 @@ function getPosition(e) {
 
 
 function addEntity(entity, data) {
-    world[entity] = data;
-    drawNextFrame(); // (but should we?)
-    //XXX: Send a XHTML Request that updates the entity you just  modified!
-
+    world[entity] = data; // (shoud we ?? ray)
+    // drawNextFrame(); // (but should we?)
+    //XXX: Send a XHTML Request that updates the entity you just modified!
+    // ??
+    // console.log("addEntityurl= " + "http://"+host+"/entity/"+String(entity));
+    sendJSONXMLHTTPRequest("http://"+host+"/entity/"+String(entity), data, function(data){return;});
 }
 
 var counter = 0;
 function addEntityWithoutName(data) {
     //var name = "X"+Math.floor((Math.random()*100)+1);
-    var name = "X"+(counter++)%100;
+    var name = "X"+(counter++)%100; // is right ?? ray
     addEntity(name,data);
 }
 
@@ -262,14 +282,22 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 
 function update() {
     //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+    // console.log("updateurl= " + "http://"+host+"/world");
+    sendJSONXMLHTTPRequest("http://"+host+"/world", null, updateWorldFromServer);
+    drawNextFrame(); // remind client to render frame
     drawFrame();
 }
 
+function updateWorldFromServer(data) {
+    if(Object.keys(data).length != 0){
+        // console.log("data", data)
+        world = data;
+    }
+}
+
 // 30 frames per second
-setInterval( update, 1000/30.0);
-
-
-
+setInterval(update, 1000/30.0);
+// setInterval(update, 2000);
     </script>
 </body>
 </html>

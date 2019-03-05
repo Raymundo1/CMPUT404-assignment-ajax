@@ -22,8 +22,9 @@
 
 
 import flask
-from flask import Flask, request
+from flask import Flask, request, redirect, jsonify, make_response
 import json
+from hashlib import md5
 app = Flask(__name__)
 app.debug = True
 
@@ -54,10 +55,14 @@ class World:
     def world(self):
         return self.space
 
+    def get_etag(self):
+        return md5(json.dumps(self.space).encode('utf-8')).hexdigest()
+
 # you can test your webservice from the commandline
 # curl -v   -H "Content-Type: application/json" -X PUT http://127.0.0.1:5000/entity/X -d '{"x":1,"y":1}' 
 
-myWorld = World()          
+myWorld = World() 
+etag =  myWorld.get_etag()
 
 # I give this to you, this is how you get the raw body/data portion of a post in flask
 # this should come with flask but whatever, it's not my project.
@@ -74,27 +79,50 @@ def flask_post_json():
 @app.route("/")
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
-    return None
+    return redirect('/static/index.html', code=301)
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
-    return None
+    # update the whole bucket of this entity
+    myWorld.set(entity, flask_post_json())
+    # return jsonify(myWorld.get(entity)), 200
+    response = make_response(jsonify(myWorld.get(entity)), 200)
+    etag = myWorld.get_etag()
+    response.headers['ETag'] = etag
+    return response
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return None
+    # https://stackoverflow.com/questions/45412228/flask-sending-data-and-status-code-through-a-response-object
+    # author: Nabin
+    # if request.headers['If-None-Match'] != etag:
+    #     response = make_response(jsonify(myWorld.world()), 200)
+    #     response.headers['ETag'] = etag
+    # else:
+    #     response = make_response(json.dumps(""), 204)
+    #     response.headers['ETag'] = etag
+    
+    response = make_response(jsonify(myWorld.world()), 200)
+    response.headers['ETag'] = etag
+    return response
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
-    return None
+    response = make_response(jsonify(myWorld.get(entity)), 200)
+    response.headers['ETag'] = etag
+    return response
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
     '''Clear the world out!'''
-    return None
+    myWorld.clear()
+    response = make_response(jsonify(myWorld.world()), 200)
+    etag = myWorld.get_etag()
+    response.headers['ETag'] = etag
+    return response
 
 if __name__ == "__main__":
     app.run()
