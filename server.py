@@ -83,13 +83,12 @@ def hello():
 
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
+    global etag
     '''update the entities via this interface'''
     # update the whole bucket of this entity
     myWorld.set(entity, flask_post_json())
-    # return jsonify(myWorld.get(entity)), 200
-    response = make_response(jsonify(myWorld.get(entity)), 200)
     etag = myWorld.get_etag()
-    response.headers['ETag'] = etag
+    response = make_response(jsonify(myWorld.get(entity)), 200)
     return response
 
 @app.route("/world", methods=['POST','GET'])    
@@ -97,31 +96,32 @@ def world():
     '''you should probably return the world here'''
     # https://stackoverflow.com/questions/45412228/flask-sending-data-and-status-code-through-a-response-object
     # author: Nabin
-    # if request.headers['If-None-Match'] != etag:
-    #     response = make_response(jsonify(myWorld.world()), 200)
-    #     response.headers['ETag'] = etag
-    # else:
-    #     response = make_response(json.dumps(""), 204)
-    #     response.headers['ETag'] = etag
     
-    response = make_response(jsonify(myWorld.world()), 200)
-    response.headers['ETag'] = etag
+    if ("If-None-Match" in request.headers):
+        if(request.headers['If-None-Match'] != etag):
+            response = make_response(jsonify(myWorld.world()), 200)
+            response.headers['ETag'] = etag
+        else:
+            response = make_response("", 200)
+            response.headers['ETag'] = "false"
+    else:
+        response = make_response(jsonify(myWorld.world()), 200)
+    
     return response
 
 @app.route("/entity/<entity>")    
 def get_entity(entity):
     '''This is the GET version of the entity interface, return a representation of the entity'''
     response = make_response(jsonify(myWorld.get(entity)), 200)
-    response.headers['ETag'] = etag
     return response
 
 @app.route("/clear", methods=['POST','GET'])
 def clear():
+    global etag
     '''Clear the world out!'''
     myWorld.clear()
     response = make_response(jsonify(myWorld.world()), 200)
     etag = myWorld.get_etag()
-    response.headers['ETag'] = etag
     return response
 
 if __name__ == "__main__":
